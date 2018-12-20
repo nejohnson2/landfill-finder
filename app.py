@@ -21,23 +21,25 @@ class LandfillHandler(web.RequestHandler):
 
 	def get(self):
 		'''Send new coordinate to client'''
-		
+		print "API Request"
 		# -- Gett DB instance
 		db = self.settings['db']
 
 		# -- Connect to collection and get one item that is marked 'incomplete'
-		coords = db['landfill-finder'].find_one({"complete":0})
+		#coords = db['landfill-finder'].find_one({"complete":0})
+		coords = [ d for d in db['landfill-finder'].aggregate([{'$sample': {'size': 1 }}])][0]
+
+		print coords['_id']
+		# data = {'lat': -74.006, 'lon': 41.7128}
+		data = {'lat': coords['lon'], 'lon': coords['lat']}
 
 		# set header infor
 		self.set_header("Access-Control-Allow-Origin", "*")
 		self.set_header("Access-Control-Allow-Methods", "GET")
 		self.set_header("Contewnt-Type", "application/json")
-
-		data = {'lat': -74.006, 'lon': 41.7128}
-
 		# send json to client
-		#self.write(json_util.dumps(coords))
-		self.write(data)
+		self.write(json_util.dumps(data))
+
 
 def main():
 	# Connect to database Database

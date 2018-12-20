@@ -1,29 +1,39 @@
+/*
+Built from examples:
+- https://openlayersbook.github.io/ch05-using-vector-layers/example-01.html
+- https://openlayers.org/en/latest/examples/draw-features.html?q=multiple
+- https://openlayers.org/en/latest/doc/quickstart.html
+*/
+var extents = new Array();
 var post_url = 'http://localhost:5000';
 var get_url = 'http://localhost:5000/api/v1/landfills';
 
-// https://openlayers.org/en/latest/doc/quickstart.html
 var raster = new ol.layer.Tile({
+  preload: Infinity,
   source: new ol.source.BingMaps({
     key: "As1jW63G51I3Z3jFZmmsNHsJ8CVxNtkyd7VCtzXk-E0Bztzd80fR0axNXApJW3O5",
     imagerySet: 'AerialWithLabels',
   })
 });
 
+var extent = new ol.interaction.Extent({
+  condition: ol.events.condition.platformModifierKeyOnly
+});
+
+var view = new ol.View({
+  center: [0,0],
+  projection: 'EPSG:4326',
+  zoom: 14
+})
+
 //////////////////////
 // Create Map 
 //////////////////////
 var map = new ol.Map({
+  renderer: 'webgl',
   layers: [raster],
   target: 'map',
-  view: new ol.View({
-    center: [-74.006, 40.7128],
-    projection: 'EPSG:4326',
-    zoom: 10
-  })
-});
-
-var extent = new ol.interaction.Extent({
-  condition: ol.events.condition.platformModifierKeyOnly
+  view: view,
 });
 
 map.addInteraction(extent);
@@ -42,13 +52,19 @@ this.addEventListener('keyup', function(event) {
     extent.setActive(false);
   }
 });
+this.addEventListener('keyup', function(event) {
+  // The letter 'a'
+  if (event.keyCode == 65) {
+    extents.push(extent.getExtent());
+  }
+});
 
 /////////////////////////
 // Submit Entry to server
 /////////////////////////
 this.addEventListener('keyup', function(event) {
   if (event.keyCode == 83) {
-    var landfill = {'extent' : extent.getExtent()};
+    var landfill = {'extent' : extents};
 
     $.ajax({
       type: "POST",
@@ -57,14 +73,41 @@ this.addEventListener('keyup', function(event) {
       data: JSON.stringify(landfill),
     });
   }
-});
+}); 
 
-/////////////////////////////
-// Center Map on new landfill
-/////////////////////////////
-function drawMap(data){
+/////////////////////////
+// Success on Get
+/////////////////////////
+function successHandler(data){
   map.getView().setCenter([data['lat'], data['lon']]);
-  map.getView().setZoom(13);
+
+  /////////
+  var style = new ol.style.Style({
+    fill: new ol.style.Fill({
+      color: [0,255,255],
+    }),
+    stroke: new ol.style.Stroke({
+      color: [64, 200, 200, 0.5],
+      width: 1      
+    })
+  });
+
+  var feature = new ol.Feature({
+    geometry: new ol.geom.Point([data['lat'], data['lon']]),
+  });
+
+  var vectorSource = new ol.source.Vector({ 
+    projection: 'EPSG:4326',
+    features: [feature],
+    style: style,
+  });
+
+  var vectorLayer = new ol.layer.Vector({
+    source: vectorSource,
+  });
+  /////////////  
+  console.log('added layer');
+  map.addLayer(vectorLayer);
 }
 
 ////////////////////////////
@@ -74,10 +117,13 @@ function getNewLandfill(){
   $.ajax({
     type: "GET",
     url: get_url,
-    success: drawMap,
+    success: successHandler,
     dataType: 'json'
   });
 }
+
+getNewLandfill();
+
 
 
 //////////////////////
